@@ -1,0 +1,28 @@
+<div class="relative flex min-h-screen w-full flex-col bg-brand-bg">
+  @switch (currentScreen()) {
+    @case (1) {
+      <app-room-scanner (generated)="onGenerated($event)" />
+    }
+    @case (2) {
+      <app-ai-dashboard
+        [roomImageUrl]="roomImageUrl()!"
+        [recommendations]="recommendations()"
+        [selectedFurniture]="selectedFurniture()"
+        (back)="currentScreen.set(1)"
+        (toggleFurniture)="onToggleFurniture($event)"
+        (proceed)="currentScreen.set(3)"
+      />
+    }
+    @case (3) {
+      @if (store(); as activeStore) {
+        <app-quotation-screen
+          [selectedFurniture]="selectedFurniture()"
+          [store]="activeStore"
+          (back)="currentScreen.set(2)"
+        />
+      }
+    }
+  }
+
+  <app-toast />
+</div>

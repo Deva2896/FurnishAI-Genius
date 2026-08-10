@@ -1,0 +1,138 @@
+<div class="flex min-h-full flex-col bg-brand-bg">
+  <header class="glass-surface app-shell-px sticky top-0 z-20 py-4">
+    <div class="app-shell-width mx-auto flex items-center gap-3">
+      <div class="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-teal to-brand-teal-light shadow-glow-teal" aria-hidden="true">
+        <span class="animate-sparkle-spin text-lg">✨</span>
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-medium text-brand-teal">{{ lang.t('brand.name') }}</p>
+        <h1 class="truncate text-lg font-bold text-brand-dark md:text-xl">{{ store()?.name ?? 'Grand Furniture Plaza' }}</h1>
+      </div>
+      <app-language-switcher />
+    </div>
+  </header>
+
+  <main class="app-shell-width app-shell-px mx-auto w-full flex-1 pb-32 pt-6 md:pb-16 md:pt-10">
+    <div class="md:grid md:grid-cols-2 md:gap-12 md:items-start">
+      <div>
+        <section class="mb-6 animate-fade-up md:mb-8">
+          <h2 class="text-xl font-extrabold leading-snug text-brand-dark md:text-3xl">
+            {{ lang.t('scanner.hero.title') }}
+          </h2>
+          <p class="mt-2 text-sm text-slate-500 md:mt-3 md:text-base">
+            {{ lang.t('scanner.hero.subtitle') }}
+          </p>
+        </section>
+
+        <section class="mb-6 md:mb-0">
+          <div
+            class="relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-colors duration-200 md:min-h-[420px]"
+            [class.border-brand-teal-light]="isDragging()"
+            [class.bg-teal-50]="isDragging()"
+            [class.border-slate-300]="!isDragging() && !previewUrl()"
+            [class.border-transparent]="previewUrl() !== null"
+            role="button"
+            tabindex="0"
+            [attr.aria-label]="previewUrl() ? lang.t('scanner.upload.ariaChange') : lang.t('scanner.upload.ariaUpload')"
+            (click)="previewUrl() ? null : fileInput.click()"
+            (keydown.enter)="previewUrl() ? null : fileInput.click()"
+            (keydown.space)="$event.preventDefault(); previewUrl() ? null : fileInput.click()"
+            (dragover)="onDragOver($event)"
+            (dragleave)="onDragLeave()"
+            (drop)="onDrop($event)"
+          >
+            <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileSelected($event)" aria-hidden="true" tabindex="-1" />
+
+            @if (previewUrl(); as url) {
+              <img [src]="url" [alt]="lang.t('scanner.upload.previewAlt')" class="absolute inset-0 h-full w-full object-cover" />
+              @if (isGenerating()) {
+                <div class="absolute inset-0 overflow-hidden bg-brand-dark/50">
+                  <div class="absolute inset-x-0 h-1/3 animate-scan-line bg-gradient-to-b from-transparent via-brand-teal-light/70 to-transparent"></div>
+                  <div class="absolute inset-x-0 bottom-4 flex justify-center">
+                    <span class="rounded-full bg-brand-dark/70 px-3 py-1 text-xs font-semibold text-white">{{ lang.t('scanner.scanning') }}</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="absolute inset-0 flex items-start justify-end gap-2 bg-gradient-to-b from-black/40 via-transparent to-transparent p-3">
+                  <button type="button" class="rounded-full bg-white/90 p-2 shadow-premium" (click)="fileInput.click(); $event.stopPropagation()" [attr.aria-label]="lang.t('scanner.upload.changeAria')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-brand-dark"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4.5 9a7.5 7.5 0 0 1 12.6-3.9L20 8M19.5 15a7.5 7.5 0 0 1-12.6 3.9L4 16"/></svg>
+                  </button>
+                  <button type="button" class="rounded-full bg-white/90 p-2 shadow-premium" (click)="removeImage($event)" [attr.aria-label]="lang.t('scanner.upload.removeAria')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-rose-500"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              }
+            } @else {
+              <div class="flex flex-col items-center gap-3">
+                <div class="flex gap-3">
+                  <span class="flex h-12 w-12 items-center justify-center rounded-full bg-brand-teal/10 text-brand-teal" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8a2 2 0 0 1 2-2h1.17a2 2 0 0 0 1.6-.8l.66-.9a2 2 0 0 1 1.6-.8h2.14a2 2 0 0 1 1.6.8l.66.9a2 2 0 0 0 1.6.8H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  </span>
+                  <span class="flex h-12 w-12 items-center justify-center rounded-full bg-brand-teal-light/10 text-brand-teal-light" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"/></svg>
+                  </span>
+                </div>
+                <p class="text-sm font-semibold text-brand-dark">{{ lang.t('scanner.upload.cta') }}</p>
+                <p class="text-xs text-slate-400">{{ lang.t('scanner.upload.hint') }}</p>
+              </div>
+            }
+          </div>
+          @if (imageError()) {
+            <p class="mt-2 text-xs font-medium text-rose-500" role="alert">{{ lang.t(imageError()!) }}</p>
+          }
+        </section>
+      </div>
+
+      <div class="flex flex-col">
+        <section class="mb-8">
+          <label for="room-prompt" class="mb-2 block text-sm font-semibold text-brand-dark">
+            {{ lang.t('scanner.prompt.label') }}
+          </label>
+          <textarea
+            id="room-prompt"
+            rows="3"
+            maxlength="300"
+            class="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm text-brand-dark shadow-sm outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-brand-teal-light focus:ring-2 focus:ring-brand-teal-light/30 md:min-h-[140px]"
+            [placeholder]="lang.t('scanner.prompt.placeholder')"
+            [value]="prompt()"
+            (input)="onPromptInput($any($event.target).value)"
+            [attr.aria-invalid]="promptError() ? true : null"
+          ></textarea>
+          @if (promptError()) {
+            <p class="mt-2 text-xs font-medium text-rose-500" role="alert">{{ lang.t(promptError()!) }}</p>
+          }
+        </section>
+
+        <button
+          type="button"
+          class="mt-auto hidden w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-brand-teal to-brand-teal-light py-3.5 text-base font-bold text-white shadow-glow-teal transition-transform duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:flex"
+          [disabled]="isGenerating()"
+          (click)="generate()"
+        >
+          @if (isGenerating()) {
+            <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"/></svg>
+            {{ lang.t('scanner.cta.busy') }}
+          } @else {
+            {{ lang.t('scanner.cta.idle') }}
+          }
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <div class="app-shell-width fixed inset-x-0 bottom-0 z-30 mx-auto border-t border-slate-100 bg-brand-warm-white/95 p-4 backdrop-blur md:hidden">
+    <button
+      type="button"
+      class="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-brand-teal to-brand-teal-light py-3.5 text-base font-bold text-white shadow-glow-teal transition-transform duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+      [disabled]="isGenerating()"
+      (click)="generate()"
+    >
+      @if (isGenerating()) {
+        <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"/></svg>
+        {{ lang.t('scanner.cta.busy') }}
+      } @else {
+        {{ lang.t('scanner.cta.idle') }}
+      }
+    </button>
+  </div>
+</div>
