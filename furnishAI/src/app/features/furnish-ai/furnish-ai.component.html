@@ -1,20 +1,22 @@
 <div class="relative flex min-h-screen w-full flex-col bg-brand-bg">
-  @switch (currentScreen()) {
-    @case (1) {
-      <app-room-scanner (generated)="onGenerated($event)" />
-    }
-    @case (2) {
-      <app-ai-dashboard
-        [roomImageUrl]="roomImageUrl()!"
-        [recommendations]="recommendations()"
-        [selectedFurniture]="selectedFurniture()"
-        (back)="currentScreen.set(1)"
-        (toggleFurniture)="onToggleFurniture($event)"
-        (proceed)="currentScreen.set(3)"
-      />
-    }
-    @case (3) {
-      @if (store(); as activeStore) {
+  @if (!loadingStore() && store(); as activeStore) {
+    @switch (currentScreen()) {
+      @case (1) {
+        <app-room-scanner [store]="activeStore" (generated)="onGenerated($event)" />
+      }
+      @case (2) {
+        <app-ai-dashboard
+          [store]="activeStore"
+          [roomImageUrl]="roomImageUrl()!"
+          [searchText]="searchText()"
+          [recommendations]="recommendations()"
+          [selectedFurniture]="selectedFurniture()"
+          (back)="currentScreen.set(1)"
+          (toggleFurniture)="onToggleFurniture($event)"
+          (proceed)="currentScreen.set(3)"
+        />
+      }
+      @case (3) {
         <app-quotation-screen
           [selectedFurniture]="selectedFurniture()"
           [store]="activeStore"
@@ -22,7 +24,22 @@
         />
       }
     }
-  }
 
-  <app-toast />
+    <app-toast />
+  } @else if (loadingStore()) {
+    <div class="flex min-h-screen items-center justify-center">
+      <div class="flex flex-col items-center gap-3">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-brand-teal"></div>
+        <p class="text-sm text-slate-500">{{ lang.t('common.loading') }}</p>
+      </div>
+    </div>
+  } @else {
+    <div class="flex min-h-screen items-center justify-center px-5">
+      <app-empty-state
+        variant="error"
+        [title]="lang.t('common.storeNotFound.title')"
+        [description]="lang.t('common.storeNotFound.desc')"
+      />
+    </div>
+  }
 </div>

@@ -1,10 +1,9 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { AIRecommendation } from '../../../core/models/ai-recommendation.model';
+import { Store } from '../../../core/models/store.model';
 import { AiDesignService } from '../../../core/services/ai-design.service';
 import { StorageService } from '../../../core/services/storage.service';
-import { StoreService } from '../../../core/services/store.service';
-import { LanguageSwitcherComponent } from '../../../shared/components/language-switcher/language-switcher.component';
+import { AppHeaderComponent } from '../../../shared/components/app-header/app-header.component';
 import { LanguageService } from '../../../shared/services/language.service';
 import { ToastService } from '../../../shared/services/toast.service';
 
@@ -14,29 +13,32 @@ export interface RoomScannerResult {
   recommendations: AIRecommendation[];
 }
 
+const PROCESSING_STEP_DELAY_MS = 900;
+
 @Component({
   selector: 'app-room-scanner',
   standalone: true,
-  imports: [LanguageSwitcherComponent],
+  imports: [AppHeaderComponent],
   templateUrl: './room-scanner.component.html'
 })
 export class RoomScannerComponent {
+  @Input({ required: true }) store!: Store;
   @Output() generated = new EventEmitter<RoomScannerResult>();
 
   private readonly storageService = inject(StorageService);
   private readonly aiDesignService = inject(AiDesignService);
-  private readonly storeService = inject(StoreService);
   protected readonly toastService = inject(ToastService);
   protected readonly lang = inject(LanguageService);
-
-  protected readonly store = toSignal(this.storeService.getCurrentStore());
 
   protected readonly previewUrl = signal<string | null>(null);
   protected readonly prompt = signal('');
   protected readonly isDragging = signal(false);
   protected readonly isGenerating = signal(false);
+  protected readonly processingStep = signal<1 | 2>(1);
   protected readonly imageError = signal<string | null>(null);
   protected readonly promptError = signal<string | null>(null);
+
+  private processingTimer?: ReturnType<typeof setTimeout>;
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -98,9 +100,12 @@ export class RoomScannerComponent {
     }
 
     this.isGenerating.set(true);
+    this.processingStep.set(1);
+    this.processingTimer = setTimeout(() => this.processingStep.set(2), PROCESSING_STEP_DELAY_MS);
+
     this.aiDesignService.generateRecommendations(this.previewUrl()!, this.prompt()).subscribe({
       next: (recommendations) => {
-        this.isGenerating.set(false);
+        this.finishProcessing();
         this.generated.emit({
           roomImageUrl: this.previewUrl()!,
           prompt: this.prompt(),
@@ -108,10 +113,15 @@ export class RoomScannerComponent {
         });
       },
       error: (error: Error) => {
-        this.isGenerating.set(false);
+        this.finishProcessing();
         this.toastService.show(this.lang.t(error.message || 'validation.generationFailed'), 'error');
       }
     });
+  }
+
+  private finishProcessing(): void {
+    this.isGenerating.set(false);
+    clearTimeout(this.processingTimer);
   }
 
   private handleFile(file: File): void {

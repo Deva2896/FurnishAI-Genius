@@ -5,14 +5,22 @@
 @layer components {
   /* Shared content-width breakpoint used by every screen's header, main
      content and fixed bars, so they all widen in lockstep: phone-width on
-     mobile, a comfortable reading width on tablet, a true multi-column
-     desktop canvas on large screens. */
+     mobile, a comfortable reading width on tablet, a professional
+     multi-column desktop canvas capped around 1280px. */
   .app-shell-width {
-    @apply max-w-[480px] sm:max-w-xl md:max-w-3xl lg:max-w-6xl;
+    @apply max-w-[480px] sm:max-w-xl md:max-w-3xl lg:max-w-[1280px];
   }
 
   .app-shell-px {
     @apply px-5 sm:px-8 lg:px-12;
+  }
+
+  /* Skeleton loading placeholder */
+  .skeleton {
+    @apply relative overflow-hidden bg-slate-200;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
 }
 
@@ -29,21 +37,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-}
-
-/* Glassmorphism surface used across premium cards/headers */
-.glass-surface {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.glass-surface-dark {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Thin, unobtrusive horizontal scrollbar for the furniture carousel */

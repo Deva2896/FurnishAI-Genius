@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { TranslationKey } from '../../shared/i18n/translations';
 
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export interface ImageValidationResult {
   valid: boolean;
@@ -19,7 +20,7 @@ export interface ImageValidationResult {
 @Injectable({ providedIn: 'root' })
 export class StorageService {
   validateRoomImage(file: File): ImageValidationResult {
-    if (!file.type.startsWith('image/')) {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       return { valid: false, error: 'validation.imageType' };
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {

@@ -12,8 +12,8 @@ import { RecommendationPosition } from '../../../core/models/ai-recommendation.m
   template: `
     <button
       type="button"
-      class="absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-brand-teal-light text-brand-dark shadow-glow-teal ring-4 ring-white/40 transition-transform duration-200 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-      [class.animate-pulse-glow]="!isOpen"
+      class="absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-brand-teal text-white shadow-raised ring-2 ring-white transition-transform duration-200 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal"
+      [class.animate-pulse-soft]="!isOpen"
       [style.left.%]="position.xPercent"
       [style.top.%]="position.yPercent"
       [attr.aria-label]="ariaLabel"

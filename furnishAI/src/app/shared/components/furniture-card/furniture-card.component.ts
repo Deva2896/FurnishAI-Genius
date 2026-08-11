@@ -1,60 +1,85 @@
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
-import { FurnitureCategory, FurnitureItem } from '../../../core/models/furniture.model';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { FurnitureItem } from '../../../core/models/furniture.model';
 import { QuotationService } from '../../../core/services/quotation.service';
 import { LanguageService } from '../../services/language.service';
-import { TranslationKey } from '../../i18n/translations';
 
-const CATEGORY_KEYS: Record<FurnitureCategory, TranslationKey> = {
-  Sofa: 'furniture.category.Sofa',
-  'TV Unit': 'furniture.category.TV Unit',
-  Table: 'furniture.category.Table',
-  Chair: 'furniture.category.Chair',
-  Storage: 'furniture.category.Storage',
-  Lighting: 'furniture.category.Lighting'
-};
-
+/**
+ * Sized to show roughly 1–1.5 cards on mobile, 2–3 on tablet, and a
+ * multi-card row on desktop inside a horizontally scrolling catalog —
+ * the width is intentionally owned here (not by the flex container) since
+ * this component is only ever used in that one horizontal-scroll context.
+ *
+ * `category`/`availability` are shop-defined free text from Firestore
+ * (multi-tenant: no fixed vocabulary), so they're displayed as-is rather
+ * than looked up in a translation dictionary.
+ */
 @Component({
   selector: 'app-furniture-card',
   standalone: true,
   template: `
     <article
-      class="flex w-40 shrink-0 flex-col overflow-hidden rounded-2xl bg-white shadow-premium ring-1 ring-slate-100 transition-transform duration-200 hover:-translate-y-0.5 sm:w-44 md:w-full md:shrink"
+      class="flex w-[72%] max-w-[280px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-card transition-shadow duration-150 hover:shadow-raised sm:w-[46%] sm:max-w-[320px] md:w-[32%] md:max-w-[300px] lg:w-64 lg:max-w-none"
     >
-      <img
-        [src]="item.imageUrl"
-        [alt]="item.name"
-        loading="lazy"
-        class="h-32 w-full object-cover md:h-40"
-      />
-      <div class="flex flex-1 flex-col gap-1 p-3">
-        <span class="text-[11px] font-medium uppercase tracking-wide text-brand-teal">{{ lang.t(categoryKey(item.category)) }}</span>
-        <h3 class="line-clamp-2 text-sm font-semibold text-brand-dark">{{ item.name }}</h3>
-        <p class="text-base font-bold text-brand-dark">{{ quotationService.formatCurrency(item.price) }}</p>
-
-        @if (item.availability === 'in-stock') {
-          <span class="text-xs font-medium text-emerald-600">{{ lang.t('furniture.availability.in-stock') }}</span>
-        } @else if (item.availability === 'made-to-order') {
-          <span class="text-xs font-medium text-amber-600">{{ lang.t('furniture.availability.made-to-order') }}</span>
+      <div class="relative">
+        @if (imageFailed()) {
+          <div class="flex h-36 w-full items-center justify-center bg-slate-100 text-slate-400 md:h-40" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-8 w-8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M4 6h16v12H4V6Z" />
+            </svg>
+          </div>
         } @else {
-          <span class="text-xs font-medium text-rose-500">{{ lang.t('furniture.availability.out-of-stock') }}</span>
+          <img
+            [src]="item.imageUrl"
+            [alt]="item.name"
+            loading="lazy"
+            class="h-36 w-full object-cover md:h-40"
+            (error)="onImageError()"
+          />
         }
+        @if (item.originalPrice && item.originalPrice > item.price) {
+          <span class="absolute left-2 top-2 rounded bg-brand-dark px-2 py-0.5 text-[11px] font-semibold text-white">
+            {{ lang.t('furniture.discount', { percent: item.discount ?? 0 }) }}
+          </span>
+        }
+      </div>
+      <div class="flex flex-1 flex-col gap-1 p-3">
+        <span class="text-[11px] font-medium uppercase tracking-wide text-brand-teal">{{ item.category }}</span>
+        <h3 class="line-clamp-2 text-sm font-semibold text-brand-dark">{{ item.name }}</h3>
+
+        <div class="flex items-baseline gap-2">
+          <p class="text-base font-bold text-brand-dark">{{ quotationService.formatCurrency(item.price) }}</p>
+          @if (item.originalPrice && item.originalPrice > item.price) {
+            <p class="text-xs text-slate-400 line-through">{{ quotationService.formatCurrency(item.originalPrice) }}</p>
+          }
+        </div>
+
+        <span
+          class="text-xs font-medium"
+          [class.text-emerald-600]="isAvailable()"
+          [class.text-rose-500]="isOutOfStock()"
+          [class.text-amber-600]="!isAvailable() && !isOutOfStock()"
+        >
+          {{ item.availability }}
+        </span>
 
         <button
           type="button"
-          class="mt-auto inline-flex items-center justify-center gap-1 rounded-full py-2 text-sm font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+          class="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50"
           [class.bg-brand-teal]="!isSelected"
           [class.text-white]="!isSelected"
-          [class.bg-emerald-100]="isSelected"
-          [class.text-emerald-700]="isSelected"
-          [disabled]="item.availability === 'out-of-stock'"
+          [class.hover:bg-brand-teal-light]="!isSelected"
+          [class.bg-slate-100]="isSelected"
+          [class.text-brand-dark]="isSelected"
+          [disabled]="isOutOfStock()"
           [attr.aria-pressed]="isSelected"
-          [attr.aria-label]="(isSelected ? lang.t('furniture.added') : lang.t('furniture.addToRoom')) + ' — ' + item.name"
+          [attr.aria-label]="(isSelected ? lang.t('furniture.added') : lang.t('furniture.addToDesign')) + ' — ' + item.name"
           (click)="toggle.emit(item)"
         >
           @if (isSelected) {
-            <span aria-hidden="true">✓</span> {{ lang.t('furniture.addedLabel') }}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+            {{ lang.t('furniture.added') }}
           } @else {
-            {{ lang.t('furniture.addToRoom') }}
+            {{ lang.t('furniture.addToDesign') }}
           }
         </button>
       </div>
@@ -68,8 +93,17 @@ export class FurnitureCardComponent {
 
   protected readonly quotationService = inject(QuotationService);
   protected readonly lang = inject(LanguageService);
+  protected readonly imageFailed = signal(false);
 
-  protected categoryKey(category: FurnitureCategory): TranslationKey {
-    return CATEGORY_KEYS[category];
+  onImageError(): void {
+    this.imageFailed.set(true);
+  }
+
+  protected isAvailable(): boolean {
+    return /^(available|in stock|yes|true)$/i.test(this.item.availability.trim());
+  }
+
+  protected isOutOfStock(): boolean {
+    return /^(out of stock|unavailable|sold out|no|false)$/i.test(this.item.availability.trim());
   }
 }

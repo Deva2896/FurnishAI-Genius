@@ -1,23 +1,26 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
 import { AIRecommendation } from '../../../core/models/ai-recommendation.model';
 import { FurnitureItem } from '../../../core/models/furniture.model';
+import { Store } from '../../../core/models/store.model';
 import { FurnitureService } from '../../../core/services/furniture.service';
 import { QuotationService } from '../../../core/services/quotation.service';
 import { AiHotspotComponent } from '../../../shared/components/ai-hotspot/ai-hotspot.component';
+import { AppHeaderComponent } from '../../../shared/components/app-header/app-header.component';
+import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import { FurnitureCardComponent } from '../../../shared/components/furniture-card/furniture-card.component';
-import { LanguageSwitcherComponent } from '../../../shared/components/language-switcher/language-switcher.component';
 import { LanguageService } from '../../../shared/services/language.service';
 import { ToastService } from '../../../shared/services/toast.service';
 
 @Component({
   selector: 'app-ai-dashboard',
   standalone: true,
-  imports: [AiHotspotComponent, FurnitureCardComponent, LanguageSwitcherComponent],
+  imports: [AiHotspotComponent, FurnitureCardComponent, AppHeaderComponent, EmptyStateComponent],
   templateUrl: './ai-dashboard.component.html'
 })
-export class AiDashboardComponent {
+export class AiDashboardComponent implements OnInit {
+  @Input({ required: true }) store!: Store;
   @Input({ required: true }) roomImageUrl!: string;
+  @Input({ required: true }) searchText = '';
   @Input({ required: true }) recommendations: AIRecommendation[] = [];
   @Input({ required: true }) selectedFurniture: FurnitureItem[] = [];
 
@@ -30,15 +33,51 @@ export class AiDashboardComponent {
   private readonly toastService = inject(ToastService);
   protected readonly lang = inject(LanguageService);
 
-  protected readonly catalog = toSignal(this.furnitureService.getCatalog(), { initialValue: [] as FurnitureItem[] });
+  protected readonly catalog = signal<FurnitureItem[]>([]);
+  protected readonly catalogLoading = signal(true);
+  protected readonly catalogError = signal(false);
   protected readonly activeRecommendationId = signal<string | null>(null);
+
+  ngOnInit(): void {
+    this.loadCatalog();
+  }
+
+  loadCatalog(): void {
+    this.catalogLoading.set(true);
+    this.catalogError.set(false);
+    this.furnitureService.searchCatalog(this.store.id, this.searchText).subscribe({
+      next: (items) => {
+        this.catalog.set(items);
+        this.catalogLoading.set(false);
+      },
+      error: () => {
+        this.catalog.set([]);
+        this.catalogError.set(true);
+        this.catalogLoading.set(false);
+      }
+    });
+  }
 
   get activeRecommendation(): AIRecommendation | undefined {
     return this.recommendations.find((rec) => rec.id === this.activeRecommendationId());
   }
 
+  /**
+   * The AI hotspot recommendations are generic zone placeholders (position +
+   * caption), not tied to any specific shop's catalog. Once the real
+   * Firestore results load, each hotspot is matched to a catalog item by
+   * id first (in case it ever lines up), falling back to its position in
+   * the recommendation list so every hotspot still opens on a real product
+   * instead of silently doing nothing when the id never matches.
+   */
   getFurnitureFor(recommendation: AIRecommendation): FurnitureItem | undefined {
-    return this.furnitureService.getById(recommendation.furnitureId);
+    const items = this.catalog();
+    const exactMatch = items.find((item) => item.id === recommendation.furnitureId);
+    if (exactMatch) {
+      return exactMatch;
+    }
+    const index = this.recommendations.indexOf(recommendation);
+    return items[index];
   }
 
   isSelected(item: FurnitureItem): boolean {

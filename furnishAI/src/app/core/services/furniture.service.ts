@@ -1,78 +1,108 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { QueryDocumentSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+import { Observable, catchError, from, map, throwError } from 'rxjs';
+import { firestore } from '../firebase/firebase';
 import { FurnitureItem } from '../models/furniture.model';
+import { Product } from '../models/product.model';
+
+const SHOPS_COLLECTION = 'shops';
+const PRODUCTS_SUBCOLLECTION = 'products';
 
 /**
- * Backed by an in-memory mock catalog today. Swap the body of `getCatalog()`
- * for `collectionData(collection(firestore, 'furniture'))` once Firestore is
- * provisioned — every consumer already depends on the `Observable<FurnitureItem[]>`
- * contract, not on how the data is sourced.
+ * Known furniture categories a shop is likely to use, each with the
+ * phrasings a customer might type in the room-scanner prompt. Firestore has
+ * no full-text search, so free text is normalized down to one of these
+ * canonical `category` values before matching — see the class doc for why.
+ */
+const CATEGORY_ALIASES: ReadonlyArray<{ canonical: string; keywords: readonly string[] }> = [
+  { canonical: 'sofa', keywords: ['sofa', 'couch', 'l-shape', 'l shape', 'sectional', 'recliner'] },
+  { canonical: 'tv unit', keywords: ['tv unit', 'tv console', 'television unit', 'tv stand', 'tv'] },
+  { canonical: 'center table', keywords: ['center table', 'centre table', 'coffee table'] },
+  { canonical: 'chair', keywords: ['chair', 'armchair', 'accent chair'] },
+  { canonical: 'storage', keywords: ['storage', 'bookshelf', 'shelf', 'wardrobe', 'cabinet'] },
+  { canonical: 'lighting', keywords: ['lighting', 'lamp', 'light'] }
+];
+
+/**
+ * Reads furniture from Firestore at `shops/{storeId}/products`, scoped to
+ * one shop's subcollection so tenants can never see each other's catalog.
+ *
+ * Firestore has no partial/full-text search, and shop owners hand-enter
+ * `category`/`tags` in the console — casing is inconsistent in practice
+ * (`"Sofa"` vs `"sofa"`), and Firestore string equality is case-sensitive.
+ * So only `show == true` is filtered server-side (a single equality filter,
+ * no index needed); category/tag matching against the normalized search
+ * term happens client-side, case-insensitively, against both fields. Free
+ * text like "L-shaped sofa for my hall" is normalized to a canonical
+ * category via `CATEGORY_ALIASES` first. A shop with a handful to a few
+ * hundred products makes fetching-then-filtering perfectly reasonable; it's
+ * the standard workaround for search Firestore can't do natively.
  */
 @Injectable({ providedIn: 'root' })
 export class FurnitureService {
-  private readonly catalog: FurnitureItem[] = [
-    {
-      id: 'sofa-l-shape-grey',
-      name: 'Premium L-Shape Grey Sofa',
-      category: 'Sofa',
-      price: 34999,
-      description: 'Plush corner sofa with a durable weave fabric — perfect for family lounging.',
-      imageUrl: 'https://placehold.co/400x400/0F766E/FFFCF5?text=L-Shape+Sofa',
-      availability: 'in-stock'
-    },
-    {
-      id: 'tv-unit-wooden',
-      name: 'Modern Wooden TV Unit',
-      category: 'TV Unit',
-      price: 14999,
-      description: 'Sleek engineered-wood console with hidden cable management.',
-      imageUrl: 'https://placehold.co/400x400/14B8A6/0F172A?text=TV+Unit',
-      availability: 'in-stock'
-    },
-    {
-      id: 'center-table-luxury',
-      name: 'Luxury Center Table',
-      category: 'Table',
-      price: 7999,
-      description: 'Tempered-glass top on a brushed metal frame for a refined centerpiece.',
-      imageUrl: 'https://placehold.co/400x400/0F766E/FFFCF5?text=Center+Table',
-      availability: 'in-stock'
-    },
-    {
-      id: 'accent-chair-designer',
-      name: 'Designer Accent Chair',
-      category: 'Chair',
-      price: 8999,
-      description: 'Statement bouclé armchair that pairs with any living-room palette.',
-      imageUrl: 'https://placehold.co/400x400/14B8A6/0F172A?text=Accent+Chair',
-      availability: 'in-stock'
-    },
-    {
-      id: 'bookshelf-modern',
-      name: 'Modern Bookshelf',
-      category: 'Storage',
-      price: 12999,
-      description: 'Open-cell shelving unit for books, decor, and display pieces.',
-      imageUrl: 'https://placehold.co/400x400/0F766E/FFFCF5?text=Bookshelf',
-      availability: 'made-to-order'
-    },
-    {
-      id: 'floor-lamp-premium',
-      name: 'Premium Floor Lamp',
-      category: 'Lighting',
-      price: 4999,
-      description: 'Warm ambient lighting on a slim brushed-brass stand.',
-      imageUrl: 'https://placehold.co/400x400/14B8A6/0F172A?text=Floor+Lamp',
-      availability: 'in-stock'
+  searchCatalog(storeId: string, searchText: string): Observable<FurnitureItem[]> {
+    if (!storeId) {
+      return throwError(() => new Error('A store id is required to search the catalog.'));
     }
-  ];
 
-  getCatalog(): Observable<FurnitureItem[]> {
-    return of(this.catalog).pipe(delay(150));
+    const category = this.resolveCategory(searchText);
+    const productsRef = collection(firestore, SHOPS_COLLECTION, storeId, PRODUCTS_SUBCOLLECTION);
+    const visibleProductsQuery = query(productsRef, where('show', '==', true));
+
+    return from(getDocs(visibleProductsQuery)).pipe(
+      map((snapshot) => {
+        const matches = snapshot.docs
+          .map((docSnapshot) => this.mapProductToFurnitureItem(storeId, docSnapshot))
+          .filter((item) => this.matchesCategory(item, category));
+
+        console.info(
+          `[FurnitureService] "${searchText}" -> category "${category}" matched ${matches.length}/${snapshot.size} visible product(s) in shops/${storeId}/products.`
+        );
+        return matches;
+      }),
+      catchError((error) => {
+        console.error(`[FurnitureService] Failed to query shops/${storeId}/products:`, error);
+        return throwError(() => error);
+      })
+    );
   }
 
-  getById(id: string): FurnitureItem | undefined {
-    return this.catalog.find((item) => item.id === id);
+  private resolveCategory(searchText: string): string {
+    const normalized = searchText.toLowerCase().trim();
+    const alias = CATEGORY_ALIASES.find((entry) => entry.keywords.some((keyword) => normalized.includes(keyword)));
+    return alias?.canonical ?? normalized;
+  }
+
+  private matchesCategory(item: FurnitureItem, category: string): boolean {
+    const haystack = [item.category, ...item.tags].map((value) => value.toLowerCase().trim());
+    return haystack.includes(category);
+  }
+
+  private normalizeTags(rawTags: Product['tags']): string[] {
+    if (!rawTags) {
+      return [];
+    }
+    return Array.isArray(rawTags) ? rawTags : [rawTags];
+  }
+
+  private mapProductToFurnitureItem(storeId: string, docSnapshot: QueryDocumentSnapshot): FurnitureItem {
+    const product = docSnapshot.data() as Product;
+    const hasDiscount = !!product.originalPrice && product.originalPrice > product.price;
+
+    return {
+      id: docSnapshot.id,
+      storeId,
+      name: product.name,
+      sku: docSnapshot.id,
+      category: product.category,
+      description: '',
+      price: product.price,
+      originalPrice: product.originalPrice,
+      discount: hasDiscount ? Math.round((1 - product.price / product.originalPrice!) * 100) : undefined,
+      imageUrl: product.imageUrl,
+      availability: product.availability,
+      tags: this.normalizeTags(product.tags),
+      featured: false
+    };
   }
 }

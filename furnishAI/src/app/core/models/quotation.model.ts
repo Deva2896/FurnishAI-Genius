@@ -5,6 +5,8 @@ export interface QuotationLineItem {
   name: string;
   category: string;
   price: number;
+  /** Percentage off the listed price (0-100), when a discount applies. */
+  discount: number;
   quantity: number;
 }
 
@@ -19,9 +21,14 @@ export interface CustomerDetails {
  */
 export interface Quotation {
   id: string;
+  quotationNumber: string;
+  storeId: string;
   customer: CustomerDetails;
   items: QuotationLineItem[];
+  subtotal: number;
+  discountTotal: number;
   totalPrice: number;
+  estimatedDelivery: string;
   createdDate: string;
   status: QuotationStatus;
 }

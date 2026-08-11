@@ -1,9 +1,14 @@
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FurnitureItem } from '../../../core/models/furniture.model';
+import { LeadRequest } from '../../../core/models/lead.model';
 import { Quotation } from '../../../core/models/quotation.model';
 import { Store } from '../../../core/models/store.model';
+import { LeadService } from '../../../core/services/lead.service';
 import { QuotationService } from '../../../core/services/quotation.service';
-import { LanguageSwitcherComponent } from '../../../shared/components/language-switcher/language-switcher.component';
+import { AppHeaderComponent } from '../../../shared/components/app-header/app-header.component';
+import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
+import { EnquiryFormComponent, EnquiryFormValue } from '../../../shared/components/enquiry-form/enquiry-form.component';
 import { StoreOffersComponent } from '../../../shared/components/store-offers/store-offers.component';
 import { LanguageService } from '../../../shared/services/language.service';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -11,10 +16,10 @@ import { ToastService } from '../../../shared/services/toast.service';
 @Component({
   selector: 'app-quotation-screen',
   standalone: true,
-  imports: [StoreOffersComponent, LanguageSwitcherComponent],
+  imports: [StoreOffersComponent, AppHeaderComponent, EmptyStateComponent, EnquiryFormComponent, DatePipe],
   templateUrl: './quotation-screen.component.html'
 })
-export class QuotationScreenComponent {
+export class QuotationScreenComponent implements OnInit {
   @Input({ required: true }) selectedFurniture: FurnitureItem[] = [];
   @Input({ required: true }) store!: Store;
 
@@ -23,13 +28,14 @@ export class QuotationScreenComponent {
   protected readonly quotationService = inject(QuotationService);
   protected readonly lang = inject(LanguageService);
   private readonly toastService = inject(ToastService);
+  private readonly leadService = inject(LeadService);
 
-  get quotation(): Quotation {
-    return this.quotationService.buildQuotation(this.selectedFurniture);
-  }
+  protected quotation!: Quotation;
+  protected readonly showEnquiryForm = signal(false);
+  protected readonly submittingEnquiry = signal(false);
 
-  get totalPrice(): number {
-    return this.selectedFurniture.reduce((total, item) => total + item.price, 0);
+  ngOnInit(): void {
+    this.quotation = this.quotationService.buildQuotation(this.selectedFurniture, this.store);
   }
 
   shareOnWhatsApp(): void {
@@ -38,9 +44,29 @@ export class QuotationScreenComponent {
     window.open(url, '_blank', 'noopener');
   }
 
-  talkToManager(): void {
-    this.quotationService.saveQuotation({ ...this.quotation, status: 'sent' }).subscribe(() => {
-      this.toastService.show(this.lang.t('quotation.managerToast'), 'info', 3000);
+  openEnquiryForm(): void {
+    this.showEnquiryForm.set(true);
+  }
+
+  closeEnquiryForm(): void {
+    this.showEnquiryForm.set(false);
+  }
+
+  submitEnquiry(value: EnquiryFormValue): void {
+    this.submittingEnquiry.set(true);
+    const request: LeadRequest = {
+      storeId: this.store.id,
+      name: value.name,
+      phone: value.phone,
+      preferredContactTime: value.preferredContactTime,
+      message: value.message || undefined,
+      quotationId: this.quotation.id
+    };
+
+    this.leadService.submitEnquiry(request).subscribe(() => {
+      this.submittingEnquiry.set(false);
+      this.showEnquiryForm.set(false);
+      this.toastService.show(this.lang.t('enquiry.success'), 'success');
     });
   }
 }

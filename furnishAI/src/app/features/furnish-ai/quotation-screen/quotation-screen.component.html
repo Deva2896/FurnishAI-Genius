@@ -1,87 +1,117 @@
 <div class="flex min-h-full flex-col bg-brand-bg pb-10">
-  <header class="glass-surface app-shell-px sticky top-0 z-20 py-4">
-    <div class="app-shell-width mx-auto flex items-center gap-3">
-      <button
-        type="button"
-        class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand-dark shadow-premium transition-transform duration-150 active:scale-95"
-        (click)="back.emit()"
-        [attr.aria-label]="lang.t('quotation.editAria')"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-      <h1 class="flex-1 text-lg font-bold text-brand-dark md:text-xl">{{ lang.t('quotation.title') }}</h1>
-      <app-language-switcher />
-    </div>
-  </header>
+  <app-header [title]="lang.t('quotation.title')" [showBack]="true" [backAriaLabel]="lang.t('quotation.editAria')" (back)="back.emit()" />
 
   <main class="app-shell-px app-shell-width mx-auto w-full flex-1 pt-6 md:pt-10">
-    <section class="mb-6 flex flex-col items-center text-center md:mb-10">
-      <div class="animate-check-pop flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-8 w-8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </div>
-      <h2 class="mt-4 text-xl font-extrabold text-brand-dark md:text-3xl">{{ lang.t('quotation.successTitle') }}</h2>
-      <p class="mt-2 text-sm text-slate-500 md:text-base">{{ lang.t('quotation.successSubtitle') }}</p>
-    </section>
-
-    <div class="md:grid md:grid-cols-[1.4fr_1fr] md:items-start md:gap-10">
-      <section class="mb-6 overflow-hidden rounded-2xl bg-white shadow-premium md:mb-0">
-        <div class="border-b border-slate-100 px-5 py-4">
-          <h3 class="text-sm font-bold uppercase tracking-wide text-brand-teal">{{ lang.t('quotation.summaryTitle') }}</h3>
+    @if (selectedFurniture.length === 0) {
+      <app-empty-state
+        variant="empty"
+        [title]="lang.t('quotation.noSelection')"
+        [retryLabel]="lang.t('quotation.editAria')"
+        (retry)="back.emit()"
+      />
+    } @else {
+      <section class="mb-6 flex flex-col items-center text-center md:mb-10">
+        <div class="animate-check-pop flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-7 w-7">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
         </div>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-xs uppercase tracking-wide text-slate-400">
-              <th class="px-5 py-2 font-medium">{{ lang.t('quotation.item') }}</th>
-              <th class="px-5 py-2 text-right font-medium">{{ lang.t('quotation.qty') }}</th>
-              <th class="px-5 py-2 text-right font-medium">{{ lang.t('quotation.price') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (item of quotation.items; track item.furnitureId) {
-              <tr class="border-t border-slate-50">
-                <td class="px-5 py-3 font-medium text-brand-dark">{{ item.name }}</td>
-                <td class="px-5 py-3 text-right text-slate-500">{{ item.quantity }}</td>
-                <td class="px-5 py-3 text-right font-semibold text-brand-dark">{{ quotationService.formatCurrency(item.price) }}</td>
-              </tr>
-            }
-          </tbody>
-          <tfoot>
-            <tr class="border-t-2 border-slate-100 bg-slate-50">
-              <td class="px-5 py-3 font-bold text-brand-dark" colspan="2">{{ lang.t('quotation.total') }}</td>
-              <td class="px-5 py-3 text-right text-lg font-extrabold text-brand-teal">{{ quotationService.formatCurrency(totalPrice) }}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <h2 class="mt-4 text-xl font-bold text-brand-dark md:text-3xl">{{ lang.t('quotation.successTitle') }}</h2>
+        <p class="mt-2 text-sm text-slate-500 md:text-base">{{ lang.t('quotation.successSubtitle') }}</p>
       </section>
 
-      <div class="flex flex-col gap-6 md:sticky md:top-24 md:self-start">
-        <app-store-offers [offers]="store.offers" />
+      <div class="md:grid md:grid-cols-[1.4fr_1fr] md:items-start md:gap-10">
+        <section class="mb-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-card md:mb-0">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
+            <div>
+              <h3 class="text-sm font-bold uppercase tracking-wide text-brand-teal">{{ lang.t('quotation.summaryTitle') }}</h3>
+              <p class="text-sm font-medium text-brand-dark">{{ store.name }}</p>
+            </div>
+            <div class="text-right text-xs text-slate-500">
+              <p>{{ lang.t('quotation.number') }}: <span class="font-semibold text-brand-dark">{{ quotation.quotationNumber }}</span></p>
+              <p>{{ lang.t('quotation.date') }}: {{ quotation.createdDate | date: 'dd MMM yyyy' }}</p>
+            </div>
+          </div>
 
-        <section class="flex flex-col gap-3">
-          <button
-            type="button"
-            class="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 py-3.5 text-base font-bold text-white shadow-premium transition-transform duration-150 active:scale-[0.98]"
-            (click)="shareOnWhatsApp()"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5" aria-hidden="true">
-              <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39a9.9 9.9 0 0 0 4.75 1.21h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.45 17.5 2 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.8-4.16-4.94-4.35-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2.01.89 2.16.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.39-.24.65-.15.27.1 1.69.8 1.98.94.29.15.48.22.55.34.07.13.07.72-.17 1.4z" />
-            </svg>
-            {{ lang.t('quotation.whatsapp') }}
-          </button>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th class="px-5 py-2 font-medium">{{ lang.t('quotation.item') }}</th>
+                  <th class="px-5 py-2 text-right font-medium">{{ lang.t('quotation.qty') }}</th>
+                  <th class="px-5 py-2 text-right font-medium">{{ lang.t('quotation.price') }}</th>
+                  <th class="px-5 py-2 text-right font-medium">{{ lang.t('quotation.discount') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of quotation.items; track item.furnitureId) {
+                  <tr class="border-t border-slate-100">
+                    <td class="px-5 py-3 font-medium text-brand-dark">{{ item.name }}</td>
+                    <td class="px-5 py-3 text-right text-slate-500">{{ item.quantity }}</td>
+                    <td class="px-5 py-3 text-right text-brand-dark">{{ quotationService.formatCurrency(item.price) }}</td>
+                    <td class="px-5 py-3 text-right text-slate-500">{{ item.discount ? item.discount + '%' : '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="border-t border-slate-100">
+                  <td class="px-5 py-2 text-slate-500" colspan="3">{{ lang.t('quotation.subtotal') }}</td>
+                  <td class="px-5 py-2 text-right text-slate-500">{{ quotationService.formatCurrency(quotation.subtotal) }}</td>
+                </tr>
+                @if (quotation.discountTotal > 0) {
+                  <tr>
+                    <td class="px-5 py-2 text-slate-500" colspan="3">{{ lang.t('quotation.discount') }}</td>
+                    <td class="px-5 py-2 text-right text-slate-500">−{{ quotationService.formatCurrency(quotation.discountTotal) }}</td>
+                  </tr>
+                }
+                <tr class="border-t-2 border-slate-100 bg-slate-50">
+                  <td class="px-5 py-3 font-bold text-brand-dark" colspan="3">{{ lang.t('quotation.total') }}</td>
+                  <td class="px-5 py-3 text-right text-lg font-bold text-brand-teal">{{ quotationService.formatCurrency(quotation.totalPrice) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
-          <button
-            type="button"
-            class="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 py-3.5 text-base font-bold text-white shadow-premium transition-transform duration-150 active:scale-[0.98]"
-            (click)="talkToManager()"
-          >
-            {{ lang.t('quotation.manager') }}
-          </button>
+          <div class="border-t border-slate-100 px-5 py-3 text-sm text-slate-500">
+            {{ lang.t('quotation.delivery') }}: <span class="font-medium text-brand-dark">{{ quotation.estimatedDelivery }}</span>
+          </div>
         </section>
+
+        <div class="flex flex-col gap-6 md:sticky md:top-24 md:self-start">
+          @if (store.offers.length > 0) {
+            <app-store-offers [offers]="store.offers" />
+          }
+
+          <section class="flex flex-col gap-3">
+            <button
+              type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-emerald-700"
+              (click)="shareOnWhatsApp()"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39a9.9 9.9 0 0 0 4.75 1.21h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.45 17.5 2 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.8-4.16-4.94-4.35-.14-.19-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.19 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2.01.89 2.16.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.21.72-.84.92-1.13.19-.29.39-.24.65-.15.27.1 1.69.8 1.98.94.29.15.48.22.55.34.07.13.07.72-.17 1.4z" />
+              </svg>
+              {{ lang.t('quotation.whatsapp') }}
+            </button>
+
+            <button
+              type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-md border border-brand-teal py-3 text-sm font-semibold text-brand-teal transition-colors duration-150 hover:bg-teal-50"
+              (click)="openEnquiryForm()"
+            >
+              {{ lang.t('quotation.contactStore') }}
+            </button>
+          </section>
+        </div>
       </div>
-    </div>
+    }
   </main>
+
+  @if (showEnquiryForm()) {
+    <app-enquiry-form
+      [isSubmitting]="submittingEnquiry()"
+      (submitted)="submitEnquiry($event)"
+      (cancelled)="closeEnquiryForm()"
+    />
+  }
 </div>

@@ -12,7 +12,7 @@ import { ToastService } from '../../services/toast.service';
     >
       @for (toast of toastService.toasts(); track toast.id) {
         <div
-          class="animate-fade-up pointer-events-auto flex max-w-full items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-brand-warm-white shadow-premium"
+          class="animate-fade-up pointer-events-auto flex max-w-full items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium text-brand-warm-white shadow-raised"
           [class.bg-brand-teal]="toast.type === 'success'"
           [class.bg-rose-600]="toast.type === 'error'"
           [class.bg-slate-800]="toast.type === 'info'"

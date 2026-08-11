@@ -12,6 +12,8 @@ const inrFormatter = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0
 });
 
+let nextQuotationSequence = 1024;
+
 /**
  * Builds and (eventually) persists quotations. `saveQuotation()` currently
  * resolves locally; wire it to `addDoc(collection(firestore, 'quotations'), ...)`
@@ -22,28 +24,42 @@ const inrFormatter = new Intl.NumberFormat('en-IN', {
 export class QuotationService {
   private readonly lang = inject(LanguageService);
 
+  formatCurrency(amount: number): string {
+    return inrFormatter.format(Math.round(amount));
+  }
+
+  /** Firestore already stores the final, payable price on `price` — nothing further to subtract. */
+  getDiscountedPrice(item: FurnitureItem): number {
+    return item.price;
+  }
+
   getTotal(items: FurnitureItem[]): number {
     return items.reduce((total, item) => total + item.price, 0);
   }
 
-  formatCurrency(amount: number): string {
-    return inrFormatter.format(amount);
-  }
-
-  buildQuotation(items: FurnitureItem[], customer: CustomerDetails = {}): Quotation {
+  buildQuotation(items: FurnitureItem[], store: Store, customer: CustomerDetails = {}): Quotation {
     const lineItems: QuotationLineItem[] = items.map((item) => ({
       furnitureId: item.id,
       name: item.name,
       category: item.category,
-      price: item.price,
+      price: item.originalPrice ?? item.price,
+      discount: item.discount ?? 0,
       quantity: 1
     }));
 
+    const subtotal = items.reduce((total, item) => total + (item.originalPrice ?? item.price), 0);
+    const totalPrice = this.getTotal(items);
+
     return {
       id: `quote-${Date.now()}`,
+      quotationNumber: `FG-${nextQuotationSequence++}`,
+      storeId: store.id,
       customer,
       items: lineItems,
-      totalPrice: this.getTotal(items),
+      subtotal,
+      discountTotal: subtotal - totalPrice,
+      totalPrice,
+      estimatedDelivery: store.estimatedDelivery,
       createdDate: new Date().toISOString(),
       status: 'draft'
     };
@@ -55,16 +71,20 @@ export class QuotationService {
 
   buildWhatsAppMessage(quotation: Quotation, store: Store): string {
     const lines = quotation.items.map(
-      (item) => `• ${item.name} — ${this.formatCurrency(item.price)}`
+      (item) => `${item.name} — ${this.formatCurrency(item.price)}`
     );
 
     return [
-      `*${store.name}*`,
-      this.lang.t('quotation.whatsappReady'),
+      this.lang.t('brand.name'),
+      store.name,
+      '',
+      `${this.lang.t('quotation.number')}: ${quotation.quotationNumber}`,
+      '',
+      `${this.lang.t('quotation.whatsappHeading')}`,
       '',
       ...lines,
       '',
-      `*${this.lang.t('quotation.whatsappTotal')}: ${this.formatCurrency(quotation.totalPrice)}*`
+      `${this.lang.t('quotation.total')}: ${this.formatCurrency(quotation.totalPrice)}`
     ].join('\n');
   }
 
